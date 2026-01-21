@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scout.Web3 | Enterprise Crypto Job Aggregator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        border: "hsl(240 3.7% 15.9%)",
+                        background: "hsl(240 10% 3.9%)",
+                        foreground: "hsl(0 0% 98%)",
+                        secondary: { DEFAULT: "hsl(240 3.7% 15.9%)", foreground: "hsl(0 0% 98%)" },
+                        muted: { DEFAULT: "hsl(240 5% 64.9%)" },
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'spin-slow': 'spin 3s linear infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;700&family=Geist:wght@300;400;500;600;700&display=swap');
+
+        :root {
+            color-scheme: dark;
+        }
+
+        body {
+            font-family: 'Geist', sans-serif;
+            background-color: #09090b;
+            color: #fafafa;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        /* Ambient Background */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(circle at 50% 50%, rgba(24, 24, 27, 0.5) 0%, transparent 100%),
+                url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.04;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .mono {
+            font-family: 'Geist Mono', monospace;
+        }
+
+        /* Scaled Motion Graphics */
+        .reveal-card {
+            opacity: 0;
+            transform: translateY(40px) scale(0.92);
+            filter: blur(12px);
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .reveal-card.active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter: blur(0);
+        }
+
+        .scanline {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.02) 50%, transparent);
+            position: absolute;
+            top: -100%;
+            animation: scan 8s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes scan {
+            0% {
+                top: -100%;
+            }
+
+            100% {
+                top: 100%;
+            }
+        }
+
+        .job-card {
+            border: 1px solid #1e1e21;
+            background: rgba(12, 12, 14, 0.3);
+            backdrop-filter: blur(8px);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .job-card:hover {
+            border-color: #ffffff40;
+            background-color: rgba(255, 255, 255, 0.03);
+            transform: scale(1.01) translateY(-4px);
+            box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.5);
+        }
+
+        .btn-sync {
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-sync::after {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: conic-gradient(from 0deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            animation: rotate 4s linear infinite;
+            display: none;
+        }
+
+        .btn-sync.syncing::after {
+            display: block;
+        }
+
+        @keyframes rotate {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .filter-chip {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .filter-chip.active {
+            background-color: white;
+            color: black;
+            border-color: white;
+            transform: scale(1.05);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            background: #27272a;
+            transition: all 0.4s ease;
+        }
+
+        .status-dot.active {
+            background: #ffffff;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
+            animation: pulse 1s infinite;
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body class="selection:bg-white selection:text-black">
+
+    <header class="border-b border-border bg-background/80 backdrop-blur-xl sticky top-0 z-50">
+        <div class="max-w-[1400px] mx-auto px-4 sm:px-8">
+            <div class="flex h-14 sm:h-16 items-center">
+                <div class="flex items-center gap-2 group cursor-pointer">
+                    <span class="font-bold text-lg sm:text-xl tracking-tighter">SCOUT<span
+                            class="text-muted font-normal">.WEB3</span></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1400px] mx-auto px-4 sm:px-8 py-8 sm:py-16">
+        <!-- Hero Section -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-8 sm:gap-12 mb-12 sm:mb-20">
+            <div class="max-w-2xl text-center md:text-left">
+                <h1
+                    class="text-4xl sm:text-7xl font-bold tracking-tight mb-4 sm:mb-8 leading-[0.95] sm:leading-[0.85] reveal-card active">
+                    Discovery<br /><span class="text-zinc-500">Engine.</span></h1>
+                <p class="text-muted text-lg sm:text-xl font-light leading-relaxed max-w-lg mx-auto md:mx-0">Parallel
+                    aggregation across the ecosystem's most active career platforms.</p>
+            </div>
+            <div class="flex flex-col items-center md:items-end gap-4 sm:gap-6">
+                <button id="run-btn" onclick="runMultiSourceScraper()"
+                    class="btn-sync w-full sm:w-auto h-14 sm:h-16 rounded-full bg-white text-black px-8 sm:px-12 text-sm font-bold shadow-[0_0_50px_rgba(255,255,255,0.1)] flex items-center justify-center gap-4 group">
+                    <i class="fa-solid fa-arrows-rotate text-xs transition-transform duration-1000" id="sync-icon"></i>
+                    Sync All Platforms
+                </button>
+                <div class="mono text-[8px] sm:text-[10px] text-zinc-600 uppercase tracking-[0.3em]">Build 2.8.5 //
+                    Hyper-Parallel</div>
+            </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="mb-10 sm:mb-16 flex flex-col md:flex-row md:items-center justify-between gap-6 sm:gap-8">
+            <div class="flex flex-wrap justify-center md:justify-start gap-2 sm:gap-4">
+                <button onclick="filterBy('all')"
+                    class="filter-chip active px-5 sm:px-8 py-2 sm:py-3 rounded-full border border-border text-[10px] sm:text-xs font-bold tracking-tight"
+                    id="filter-all">All</button>
+                <button onclick="filterBy('engineering')"
+                    class="filter-chip px-5 sm:px-8 py-2 sm:py-3 rounded-full border border-border text-[10px] sm:text-xs font-bold text-muted tracking-tight"
+                    id="filter-engineering">Engineering</button>
+                <button onclick="filterBy('design')"
+                    class="filter-chip px-5 sm:px-8 py-2 sm:py-3 rounded-full border border-border text-[10px] sm:text-xs font-bold text-muted tracking-tight"
+                    id="filter-design">Design</button>
+                <button onclick="filterBy('product')"
+                    class="filter-chip px-5 sm:px-8 py-2 sm:py-3 rounded-full border border-border text-[10px] sm:text-xs font-bold text-muted tracking-tight"
+                    id="filter-product">Product</button>
+            </div>
+
+            <div class="flex items-center justify-center md:justify-end gap-4">
+                <span
+                    class="text-[9px] sm:text-[10px] uppercase text-zinc-600 mono font-bold tracking-widest">Sort:</span>
+                <select id="sort-select" onchange="handleSortChange()"
+                    class="bg-transparent border border-border rounded-xl sm:rounded-2xl px-4 sm:px-6 py-2 sm:py-3 text-[10px] sm:text-xs font-bold focus:outline-none focus:border-white transition-all min-w-[120px] sm:min-w-[160px]">
+                    <option value="newest">Recent</option>
+                    <option value="oldest">Historical</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 sm:gap-16">
+            <!-- Sidebar -->
+            <aside class="lg:col-span-3 space-y-10 sm:space-y-16 order-2 lg:order-1">
+                <div class="reveal-card active text-center lg:text-left">
+                    <p
+                        class="text-[9px] sm:text-[10px] uppercase text-muted mono font-bold tracking-[0.3em] mb-2 sm:mb-4">
+                        Live Pipeline</p>
+                    <div class="flex items-baseline justify-center lg:justify-start gap-3">
+                        <h2 id="stat-count" class="text-5xl sm:text-6xl font-bold tracking-tighter">0</h2>
+                        <span class="text-zinc-500 text-xs sm:text-sm font-medium uppercase">Results</span>
+                    </div>
+                </div>
+
+                <div class="space-y-6 sm:space-y-8 reveal-card active" style="transition-delay: 100ms">
+                    <p
+                        class="text-[9px] sm:text-[10px] uppercase text-muted mono font-bold tracking-[0.3em] text-center lg:text-left">
+                        Monitored Platforms</p>
+                    <div class="space-y-4 sm:space-y-6 bg-black/20 p-6 rounded-3xl lg:bg-transparent lg:p-0"
+                        id="source-indicators">
+                        <!-- Items dynamically generated -->
+                    </div>
+                </div>
+
+                <div class="rounded-3xl border border-border bg-black/40 p-6 sm:p-8 relative overflow-hidden group reveal-card active"
+                    style="transition-delay: 200ms">
+                    <div class="scanline"></div>
+                    <div class="flex items-center justify-between mb-6 sm:mb-8 relative z-10">
+                        <span
+                            class="text-[8px] sm:text-[9px] font-bold uppercase text-zinc-600 mono tracking-widest">Console_Output</span>
+                        <div class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
+                    </div>
+                    <div id="logs"
+                        class="mono text-[9px] sm:text-[10px] leading-relaxed space-y-3 h-48 sm:h-64 overflow-y-auto text-zinc-500 relative z-10 pr-2">
+                        <div class="text-zinc-800 italic">Systems Nominal...</div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Job Feed -->
+            <section class="lg:col-span-9 order-1 lg:order-2">
+                <div id="loading-state" class="hidden py-32 sm:py-48 text-center">
+                    <div class="inline-block relative">
+                        <div
+                            class="h-16 w-16 sm:h-20 sm:w-20 rounded-full border-[2px] border-zinc-900 border-t-white animate-spin">
+                        </div>
+                    </div>
+                    <p
+                        class="mt-8 sm:mt-10 text-[10px] sm:text-xs text-muted mono uppercase tracking-[0.5em] sm:tracking-[1em] animate-pulse">
+                        Polling Global Network</p>
+                </div>
+
+                <div id="empty-state"
+                    class="py-40 sm:py-60 rounded-[2rem] sm:rounded-[3rem] border border-dashed border-border flex flex-col items-center justify-center grayscale opacity-20">
+                    <i class="fa-solid fa-cube text-4xl sm:text-5xl mb-6 sm:mb-8"></i>
+                    <p class="text-xs sm:text-sm font-light tracking-widest">IDLE_STATE: NO_DATA_FOUND</p>
+                </div>
+
+                <div id="job-grid" class="grid grid-cols-1 gap-4 sm:gap-8">
+                    <!-- Cards -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        const PLATFORMS = [
+            { id: 1, name: "CryptoJobs", url: "https://cryptocurrencyjobs.co/index.xml", type: "rss" },
+            { id: 2, name: "Web3Career", url: "https://web3.career/jobs.xml", type: "rss" },
+            { id: 3, name: "CryptoJobsList", url: "https://cryptojobslist.com/job/rss", type: "rss" },
+            { id: 4, name: "SolanaJobs", url: "https://solana.jobs/rss", type: "rss" },
+            { id: 5, name: "RemoteOK", url: "https://remoteok.com/remote-crypto-jobs.json", type: "json" },
+            { id: 6, name: "Remotive", url: "https://remotive.com/api/remote-jobs?category=software-dev", type: "json" }
+        ];
+
+        let masterJobs = [];
+        let currentFilter = 'all';
+        let currentSort = 'newest';
+
+        const KEYWORDS = {
+            engineering: ['developer', 'engineer', 'frontend', 'backend', 'fullstack', 'solidity', 'rust', 'go', 'python', 'devops', 'security', 'technical', 'architect'],
+            design: ['design', 'designer', 'ux', 'ui', 'creative', 'graphics', 'product design', 'visual'],
+            product: ['product manager', 'product owner', 'pm', 'analyst', 'strategy']
+        };
+
+        function initSidebar() {
+            const container = document.getElementById('source-indicators');
+            container.innerHTML = PLATFORMS.map(s => `
+                <div class="flex items-center justify-between group/item">
+                    <div class="flex items-center gap-4 sm:gap-5">
+                        <div class="status-dot" id="dot-source-${s.id}"></div>
+                        <span class="text-xs sm:text-sm font-semibold tracking-tight text-zinc-500 group-hover/item:text-white transition-colors">${s.name}</span>
+                    </div>
+                    <span id="status-source-${s.id}" class="mono text-[8px] sm:text-[9px] text-zinc-800 uppercase tracking-widest group-hover/item:text-zinc-600">Pending</span>
+                </div>
+            `).join('');
+        }
+
+        function addLog(msg, type = "info") {
+            const logContainer = document.getElementById('logs');
+            const color = type === "error" ? "text-red-600" : (type === "success" ? "text-white" : "text-zinc-600");
+            const entry = document.createElement('div');
+            entry.className = `${color} transition-all duration-700 transform translate-x-[-10px] opacity-0`;
+            entry.innerHTML = `<span class="text-zinc-900 mr-2">/</span> ${msg}`;
+            logContainer.appendChild(entry);
+
+            requestAnimationFrame(() => {
+                entry.style.transform = 'translateX(0)';
+                entry.style.opacity = '1';
+            });
+
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        async function fetchReliable(url, platformName) {
+            const proxies = [
+                `https://api.allorigins.win/get?url=${encodeURIComponent(url + '?v=' + Date.now())}`,
+                `https://corsproxy.io/?${encodeURIComponent(url)}`
+            ];
+
+            for (const proxy of proxies) {
+                try {
+                    const res = await fetch(proxy);
+                    if (!res.ok) continue;
+                    const data = await res.json();
+                    return data.contents || data;
+                } catch (e) { continue; }
+            }
+            throw new Error("Full connection blackout");
+        }
+
+        async function syncPlatform(platform) {
+            const statusEl = document.getElementById(`status-source-${platform.id}`);
+            const dotEl = document.getElementById(`dot-source-${platform.id}`);
+
+            statusEl.textContent = "Polling";
+            statusEl.classList.add('text-white');
+            dotEl.classList.add('active');
+
+            try {
+                const data = await fetchReliable(platform.url, platform.name);
+                let jobs = [];
+
+                if (platform.type === "rss") {
+                    const xml = new DOMParser().parseFromString(typeof data === 'string' ? data : JSON.stringify(data), "text/xml");
+                    jobs = Array.from(xml.querySelectorAll("item")).map(item => ({
+                        id: Math.random().toString(36).substr(2, 9),
+                        title: item.querySelector("title")?.textContent.split(" at ")[0] || "Specialist",
+                        company: item.querySelector("title")?.textContent.split(" at ")[1] || platform.name,
+                        link: item.querySelector("link")?.textContent || "#",
+                        date: new Date(item.querySelector("pubDate")?.textContent || Date.now()),
+                        desc: (item.querySelector("description")?.textContent || "").replace(/<[^>]*>/g, '').substring(0, 140),
+                        source: platform.name
+                    }));
+                } else {
+                    const json = typeof data === 'string' ? JSON.parse(data) : data;
+                    const list = platform.name === "Remotive" ? json.jobs : (Array.isArray(json) ? json.slice(1) : []);
+                    jobs = list.map(j => ({
+                        id: j.id || Math.random(),
+                        title: j.position || j.title,
+                        company: j.company || j.company_name,
+                        link: j.url,
+                        date: new Date(j.date || j.publication_date),
+                        desc: (j.description || "").replace(/<[^>]*>/g, '').substring(0, 140),
+                        source: platform.name
+                    }));
+                }
+
+                statusEl.textContent = "Synced";
+                statusEl.classList.replace('text-white', 'text-zinc-600');
+                dotEl.classList.remove('active');
+                addLog(`Success: ${platform.name} retrieved ${jobs.length} nodes.`, "success");
+                return jobs;
+            } catch (err) {
+                statusEl.textContent = "Error";
+                statusEl.classList.replace('text-white', 'text-red-950');
+                dotEl.style.background = '#ef4444';
+                addLog(`Critical: Platform ${platform.name} unreachable.`, "error");
+                return [];
+            }
+        }
+
+        async function runMultiSourceScraper() {
+            const btn = document.getElementById('run-btn');
+            const icon = document.getElementById('sync-icon');
+            const loading = document.getElementById('loading-state');
+            const empty = document.getElementById('empty-state');
+            const grid = document.getElementById('job-grid');
+
+            btn.disabled = true;
+            btn.classList.add('syncing', 'opacity-50');
+            icon.classList.add('fa-spin');
+            loading.classList.remove('hidden');
+            empty.classList.add('hidden');
+            grid.innerHTML = '';
+
+            addLog("Hyper-Parallel Handshake Initiated.");
+
+            const results = await Promise.all(PLATFORMS.map(p => syncPlatform(p)));
+            masterJobs = results.flat();
+
+            renderJobs(masterJobs);
+
+            btn.disabled = false;
+            btn.classList.remove('syncing', 'opacity-50');
+            icon.classList.remove('fa-spin');
+            loading.classList.add('hidden');
+        }
+
+        function filterBy(category) {
+            currentFilter = category;
+            document.querySelectorAll('.filter-chip').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`filter-${category}`).classList.add('active');
+            renderJobs(masterJobs);
+        }
+
+        function handleSortChange() {
+            currentSort = document.getElementById('sort-select').value;
+            renderJobs(masterJobs);
+        }
+
+        function renderJobs(jobsList) {
+            const grid = document.getElementById('job-grid');
+            const empty = document.getElementById('empty-state');
+
+            let processed = [...jobsList];
+            if (currentFilter !== 'all') {
+                const keywords = KEYWORDS[currentFilter];
+                processed = processed.filter(j => keywords.some(k => (j.title + j.desc).toLowerCase().includes(k)));
+            }
+
+            processed.sort((a, b) => currentSort === 'newest' ? b.date - a.date : a.date - b.date);
+
+            document.getElementById('stat-count').textContent = processed.length;
+
+            if (processed.length === 0) {
+                grid.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            empty.classList.add('hidden');
+
+            grid.innerHTML = processed.map((job, index) => `
+                <div class="job-card reveal-card rounded-[1.5rem] sm:rounded-[2.5rem] p-6 sm:p-10" style="transition-delay: ${index * 40}ms">
+                    <div class="flex flex-col md:flex-row justify-between items-start gap-6 sm:gap-10">
+                        <div class="space-y-3 sm:space-y-4 flex-1">
+                            <div class="flex items-center flex-wrap gap-2 sm:gap-4">
+                                <h3 class="text-xl sm:text-3xl font-bold text-white tracking-tighter line-clamp-2">${job.title}</h3>
+                                <div class="px-2 sm:px-3 py-1 rounded-full border border-white/10 bg-white/5 mono text-[7px] sm:text-[8px] uppercase tracking-widest text-zinc-500">${job.source}</div>
+                            </div>
+                            <div class="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm font-medium">
+                                <span class="text-white">${job.company}</span>
+                                <span class="text-zinc-700 mono text-[10px] sm:text-xs">${isNaN(job.date) ? 'Live' : job.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                            </div>
+                            <p class="text-sm sm:text-lg text-zinc-500 leading-relaxed font-light mt-4 sm:mt-8 line-clamp-2">${job.desc}</p>
+                        </div>
+                        <a href="${job.link}" target="_blank" class="w-full md:w-auto h-12 sm:h-16 inline-flex items-center justify-center rounded-[1rem] sm:rounded-[1.5rem] bg-white text-black px-8 sm:px-12 text-xs sm:text-sm font-black transition-all hover:scale-105 active:scale-95 shadow-xl">
+                            View Job
+                        </a>
+                    </div>
+                </div>
+            `).join('');
+
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    grid.querySelectorAll('.reveal-card').forEach(c => c.classList.add('active'));
+                }, 100);
+            });
+        }
+
+        window.onload = initSidebar;
+    </script>
+</body>
+
+</html>
